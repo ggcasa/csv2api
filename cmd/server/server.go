@@ -81,6 +81,32 @@ func main() {
 	log.Fatal(http.ListenAndServe(cfg.Server.Port, nil))
 }
 
+// func masiniHandler(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
+// 	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+// 	limita := r.URL.Query().Get("limit")
+// 	if limita == "" {
+// 		limita = "5000"
+// 	}
+
+// 	query := fmt.Sprintf("SELECT id_bula, marca, culoare, marime_volum, greutate_kg, location_block FROM %s LIMIT ?", tabel)
+// 	rows, err := db.Query(query, limita)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), 500)
+// 		return
+// 	}
+// 	defer rows.Close()
+
+// 	var lista []Masina
+// 	for rows.Next() {
+// 		var m Masina
+// 		_ = rows.Scan(&m.ID_Bula, &m.Marca, &m.Culoare, &m.MarimeVolum, &m.GreutateKg, &m.LocationBlock)
+// 		lista = append(lista, m)
+// 	}
+// 	_ = json.NewEncoder(w).Encode(lista)
+// }
+
 func masiniHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -104,7 +130,34 @@ func masiniHandler(w http.ResponseWriter, r *http.Request) {
 		_ = rows.Scan(&m.ID_Bula, &m.Marca, &m.Culoare, &m.MarimeVolum, &m.GreutateKg, &m.LocationBlock)
 		lista = append(lista, m)
 	}
-	_ = json.NewEncoder(w).Encode(lista)
+
+	// Citim istoricul din tracking_bule din SQLite3
+	historyRows, err := db.Query("SELECT id_bula, location_block, latitudine, longitudine, data_modificare FROM tracking_bule")
+	if err != nil {
+		// Dacă tabela de tracking e goală sau dă eroare, trimitem măcar catalogul existent
+		raspunsCumulat := map[string]interface{}{
+			"catalog":  lista,
+			"tracking": []PunctTraseu{},
+		}
+		_ = json.NewEncoder(w).Encode(raspunsCumulat)
+		return
+	}
+	defer historyRows.Close()
+
+	var istoricGlobal []PunctTraseu
+	for historyRows.Next() {
+		var p PunctTraseu
+		_ = historyRows.Scan(&p.IDBula, &p.LocationBlock, &p.Latitudine, &p.Longitudine, &p.DataModificare)
+		istoricGlobal = append(istoricGlobal, p)
+	}
+
+	// Împachetăm pachetul mare pentru browser
+	raspunsCumulat := map[string]interface{}{
+		"catalog":  lista,
+		"tracking": istoricGlobal,
+	}
+
+	_ = json.NewEncoder(w).Encode(raspunsCumulat)
 }
 
 // HANDLERUL NOU: Primește JSON-ul compact din IndexedDB și îl pune în SQLite3
