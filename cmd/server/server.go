@@ -17,7 +17,7 @@ import (
 type Masina struct {
 	ID_Bula       string `json:"id_bula"`
 	Marca         string `json:"marca"`
-	Culoare       string `json:"carma"` // Păstrăm structura ta existentă
+	Culoare       string `json:"culoare"` // Păstrăm structura ta existentă
 	MarimeVolum   int    `json:"marime_volum"`
 	GreutateKg    int    `json:"greutate_kg"`
 	LocationBlock string `json:"location_block"`

@@ -1,77 +1,144 @@
 <!DOCTYPE html>
-<html>
+<html lang="ro">
 <head>
     <meta charset="UTF-8">
+    <title>Bubble Planet - Control</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f6f9; color: #333; margin: 20px; }
+        .control-panel { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        input, button { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        input:focus { border-color: #007bff; outline: none; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        #btn_trimite { background: #28a745; }
+        #btn_trimite:hover { background: #218838; }
+        
+        /* Grid pentru afișare */
+        .continut { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h3 { margin-top: 0; color: #007bff; border-bottom: 2px solid #f4f6f9; padding-bottom: 8px; }
+        .info-item { margin: 10px 0; font-size: 15px; }
+        .info-item strong { color: #555; }
+
+        /* Stil Timeline pentru Istoric */
+        .timeline { list-style: none; padding: 0; margin: 0; position: relative; }
+        .timeline::before { content: ''; position: absolute; left: 19px; top: 0; bottom: 0; width: 2px; background: #e9ecef; }
+        .timeline-item { position: relative; margin-bottom: 15px; padding-left: 45px; }
+        .timeline-dot { position: absolute; left: 10px; top: 5px; width: 10px; height: 10px; background: #007bff; border: 4px solid white; border-radius: 50%; box-shadow: 0 0 0 2px #007bff; }
+        .timeline-date { font-size: 12px; color: #888; }
+        .timeline-content { font-size: 14px; margin-top: 2px; font-weight: bold; }
+        
+        .status-badge { display: inline-block; padding: 3px 8px; background: #ffc107; color: #000; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 15px; }
+    </style>
 </head>
 <body>
 
-    <div style="margin-bottom: 20px;">
-        <input type="text" id="cauta_id" placeholder="ID Bula">
+    <div class="control-panel">
+        <input type="text" id="cauta_id" placeholder="ID Bula (ex: AAGPV)">
+        <input type="text" id="nou_block" placeholder="Nume Block / Cameră">
         <input type="text" id="simuleaza_lat" placeholder="Latitudine">
         <input type="text" id="simuleaza_long" placeholder="Longitudine">
-        <input type="text" id="nou_block" placeholder="Nume Block">
-        <button id="btn_aloca">Alocă Locație (Track)</button>
-        <button id="btn_trimite" style="background-color: #4CAF50; color: white;">Trimite la Server</button>
+        <button id="btn_aloca">Mută / Înregistrează</button>
+        <button id="btn_trimite">Trimite la Server</button>
     </div>
 
-    <pre id="ecran"></pre>
+    <div id="status_retea" class="status-badge">Se încarcă datele...</div>
+    
+    <div class="continut" id="zona_vizuala" style="display: none;">
+        <div class="card">
+            <h3>Detalii Vehicul</h3>
+            <div id="detalii_vehicul"></div>
+        </div>
+
+        <div class="card">
+            <h3>Istoric Mișcare (Tracking)</h3>
+            <ul class="timeline" id="istoric_timeline"></ul>
+        </div>
+    </div>
 
 <script>
     (async () => {
-        const ecran = document.getElementById("ecran");
-        const cerereDB = indexedDB.open("pwa_db", 4);
-
-        cerereDB.onupgradeneeded = (e) => {
-            const dbUpgrade = e.target.result;
-            if (!dbUpgrade.objectStoreNames.contains("masini")) {
-                dbUpgrade.createObjectStore("masini", { keyPath: "id_bula" });
-            }
-            if (!dbUpgrade.objectStoreNames.contains("modificari")) {
-                dbUpgrade.createObjectStore("modificari", { keyPath: "id_bula" });
-            }
-        };
+        const cerereDB = indexedDB.open("pwa_db", 6); 
+        let dateMasini = [];
+        let istoricDeLaServer = [];
 
         cerereDB.onsuccess = async (e) => {
             const db = e.target.result;
-            let dateMasini = [];
 
-            const afiseaza = (text) => ecran.innerText = typeof text === "string" ? text : JSON.stringify(text, null, 2);
-
+            // Încercare conexiune server
             try {
-                dateMasini = await (await fetch("http://localhost:9977/")).json();
+                const dateServer = await (await fetch("http://localhost:9977/")).json();
+                dateMasini = dateServer.catalog;
+                istoricDeLaServer = dateServer.tracking || [];
+
                 const stocare = db.transaction("masini", "readwrite").objectStore("masini");
                 dateMasini.map(m => stocare.put(m));
-                afiseaza(dateMasini);
+                
+                document.getElementById("status_retea").innerText = "ONLINE - Date sincronizate";
+                document.getElementById("status_retea").style.background = "#28a745";
+                document.getElementById("status_retea").style.color = "white";
             } catch {
                 db.transaction("masini", "readonly").objectStore("masini").getAll().onsuccess = (ev) => {
                     dateMasini = ev.target.result;
-                    afiseaza("MOD OFFLINE - Date din cache\n\n" + JSON.stringify(dateMasini, null, 2));
+                    document.getElementById("status_retea").innerText = "OFFLINE - Rulare din cache";
                 };
             }
 
+            // Logica de căutare și randare interfață grafică
             document.getElementById("cauta_id").oninput = (ev) => {
                 const valoare = ev.target.value.toUpperCase();
-                if (!valoare) { afiseaza(dateMasini); return; }
+                const zonaVizuala = document.getElementById("zona_vizuala");
+                
+                if (!valoare) {
+                    zonaVizuala.style.display = "none";
+                    return;
+                }
 
-                const masinaGasita = dateMasini.find(m => m.id_bula === valoare);
+                const masina = dateMasini.find(m => m.id_bula === valoare);
 
                 db.transaction("modificari", "readonly").objectStore("modificari").getAll().onsuccess = (eveniment) => {
-                    const istoricTraseu = eveniment.target.result.filter(mod => mod.id_bula === valoare);
-                    if (masinaGasita || istoricTraseu.length > 0) {
-                        afiseaza({ vehicul: masinaGasita || "Bulă nouă", istoric_tracking: istoricTraseu });
+                    const modificariLocale = eveniment.target.result.filter(mod => mod.id_bula === valoare);
+                    const istoricOficial = istoricDeLaServer.filter(mod => mod.id_bula === valoare);
+                    const istoricTotal = [...istoricOficial, ...modificariLocale];
+
+                    if (masina || istoricTotal.length > 0) {
+                        zonaVizuala.style.display = "grid";
+
+                        // 1. Randerem Cardul cu Detalii
+                        document.getElementById("detalii_vehicul").innerHTML = masina ? `
+                            <div class="info-item"><strong>ID Bulă:</strong> ${masina.id_bula}</div>
+                            <div class="info-item"><strong>Marcă:</strong> ${masina.marca}</div>
+                            <div class="info-item"><strong>Culoare:</strong> ${masina.culoare}</div>
+                            <div class="info-item"><strong>Volum:</strong> ${masina.marime_volum} m³</div>
+                            <div class="info-item"><strong>Greutate:</strong> ${masina.greutate_kg} kg</div>
+                            <div class="info-item"><strong>Locație Inițială:</strong> ${masina.location_block}</div>
+                        ` : `<p>Bula nu există în catalogul de pe server.</p>`;
+
+                        // 2. Randerem Timeline-ul pentru Istoric
+                        const timelineHTML = istoricTotal.map(punct => `
+                            <li class="timeline-item">
+                                <div class="timeline-dot"></div>
+                                <div class="timeline-date">${punct.data_modificare}</div>
+                                <div class="timeline-content">${punct.location_block}</div>
+                                <div class="timeline-date">Coordonate: ${punct.latitudine}, ${punct.longitudine}</div>
+                            </li>
+                        `).join("");
+
+                        document.getElementById("istoric_timeline").innerHTML = timelineHTML || "<p style='color:#888; padding-left:10px;'>Nicio mișcare înregistrată încă.</p>";
                     } else {
-                        afiseaza("Nu s-a găsit nimic pentru ID: " + valoare);
+                        zonaVizuala.style.display = "none";
                     }
                 };
             };
 
+            // Buton Alocare / Mutare
             document.getElementById("btn_aloca").onclick = () => {
                 const idCautat = document.getElementById("cauta_id").value.toUpperCase();
+                const block = document.getElementById("nou_block").value;
                 const lat = document.getElementById("simuleaza_lat").value;
                 const long = document.getElementById("simuleaza_long").value;
-                const block = document.getElementById("nou_block").value;
 
-                if (dateMasini.some(m => m.id_bula === idCautat) && lat && long && block) {
+                if (dateMasini.some(m => m.id_bula === idCautat) && block && lat && long) {
                     const punctTraseu = {
                         id_bula: idCautat,
                         location_block: block,
@@ -83,6 +150,10 @@
                     const tranzactie = db.transaction("modificari", "readwrite");
                     tranzactie.objectStore("modificari").add(punctTraseu);
                     tranzactie.oncomplete = () => {
+                        // Resetăm câmpurile de mutare după adăugare
+                        document.getElementById("nou_block").value = "";
+                        document.getElementById("simuleaza_lat").value = "";
+                        document.getElementById("simuleaza_long").value = "";
                         document.getElementById("cauta_id").dispatchEvent(new Event('input'));
                     };
                 } else {
@@ -90,45 +161,36 @@
                 }
             };
 
-            // FUNCȚIA DE TRIMITERE (EXPORT CĂTRE SERVERUL GO)
+            // Buton Sincronizare Server
             document.getElementById("btn_trimite").onclick = () => {
-                // 1. Citim tot ce s-a adunat în tabelul local "modificari"
                 db.transaction("modificari", "readonly").objectStore("modificari").getAll().onsuccess = async (ev) => {
                     const deTrimis = ev.target.result;
-
-                    if (deTrimis.length === 0) {
-                        alert("Nu ai nicio locație nouă salvată pe laptop pentru export!");
-                        return;
-                    }
+                    if (deTrimis.length === 0) { alert("Nu ai mișcări noi salvate local!"); return; }
 
                     try {
-                        // 2. Facem POST către serverul tău Go (presupunem endpoint-ul /salveaza-tracking)
                         const raspuns = await fetch("http://localhost:9977/salveaza-tracking", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(deTrimis) // Trimitem array-ul curat cu istoricul
+                            body: JSON.stringify(deTrimis)
                         });
 
                         if (raspuns.ok) {
-                            // 3. Dacă serverul Go a zis OK și le-a scris în SQLite, ștergem tabelul local ca să nu le duplicăm data viitoare
                             const stergere = db.transaction("modificari", "readwrite");
                             stergere.objectStore("modificari").clear();
-
-                            stergere.oncomplete = () => {
-                                alert("Datele au fost sincronizate cu succes în baza SQLite3!");
-                                afiseaza("Toate modificările au fost trimise. Stoc local gol.");
+                            stergere.oncomplete = async () => {
+                                alert("Sincronizare reușită în SQLite3!");
+                                const updateDate = await (await fetch("http://localhost:9977/")).json();
+                                istoricDeLaServer = updateDate.tracking || [];
+                                document.getElementById("cauta_id").dispatchEvent(new Event('input'));
                             };
-                        } else {
-                            alert(`Serverul Go a returnat eroare: ${raspuns.status}`);
                         }
-                    } catch (eroare) {
-                        alert("Nu s-a putut contacta serverul Go. Ai pornit containerul/baza? " + eroare.message);
+                    } catch {
+                        alert("Eroare la conectarea cu serverul Go!");
                     }
                 };
             };
         };
     })();
 </script>
-
 </body>
 </html>
