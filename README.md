@@ -65,9 +65,16 @@ go get github.com/glebarez/go-sqlite
 go mod tidy
 ```
 ### 2. Executarea directă (Mod Dezvoltare)
+#### generarea documentului cars.csv
 ```bash
 go run cmd/generator/generator.go config.go
+```
+#### Migrarerea documentului csv la sqlite3
+```bash
 go run cmd/migrator/migrator.go config.go
+```
+#### Rulare server port:9977 
+```bash
 go run cmd/server/server.go config.go
 ```
 ### 3. Compilarea nativă în binare independente
