@@ -1,6 +1,60 @@
-# Ignoră fișierele de date generate
+# ==========================================
+# 1. Specifice Proiectului (Date & Binare)
+# ==========================================
+# Ignoră fișierele de date generate de generator/migrator
 *.csv
 *.db
+*.db-shm
+*.db-wal
 
-# Ignoră executabilele compilate
+# Ignoră directoarele de compilare locală și artefactele
 bin/
+dist/
+
+# ==========================================
+# 2. Specifice Limbajului Go (Golang)
+# ==========================================
+# Fișiere de test și acoperire (coverage)
+*.out
+*.test
+*.prof
+
+# Executabile compilate accidental în rădăcină (fără extensie sau .exe)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# ==========================================
+# 3. IDE / Editoare de Cod
+# ==========================================
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (GoLand, IntelliJ etc.)
+.idea/
+
+# Editoare temporare (Vim / Nano)
+*~
+*.swp
+*.swo
+
+# ==========================================
+# 4. Sistem de Operare
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+desktop.ini

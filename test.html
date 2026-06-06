@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+
+    <div style="margin-bottom: 20px;">
+        <input type="text" id="cauta_id" placeholder="ID Bula">
+        <input type="text" id="simuleaza_lat" placeholder="Latitudine">
+        <input type="text" id="simuleaza_long" placeholder="Longitudine">
+        <input type="text" id="nou_block" placeholder="Nume Block">
+        <button id="btn_aloca">Alocă Locație (Track)</button>
+        <button id="btn_trimite" style="background-color: #4CAF50; color: white;">Trimite la Server</button>
+    </div>
+
+    <pre id="ecran"></pre>
+
+<script>
+    (async () => {
+        const ecran = document.getElementById("ecran");
+        const cerereDB = indexedDB.open("pwa_db", 4);
+
+        cerereDB.onupgradeneeded = (e) => {
+            const dbUpgrade = e.target.result;
+            if (!dbUpgrade.objectStoreNames.contains("masini")) {
+                dbUpgrade.createObjectStore("masini", { keyPath: "id_bula" });
+            }
+            if (!dbUpgrade.objectStoreNames.contains("modificari")) {
+                dbUpgrade.createObjectStore("modificari", { keyPath: "id_bula" });
+            }
+        };
+
+        cerereDB.onsuccess = async (e) => {
+            const db = e.target.result;
+            let dateMasini = [];
+
+            const afiseaza = (text) => ecran.innerText = typeof text === "string" ? text : JSON.stringify(text, null, 2);
+
+            try {
+                dateMasini = await (await fetch("http://localhost:9977/")).json();
+                const stocare = db.transaction("masini", "readwrite").objectStore("masini");
+                dateMasini.map(m => stocare.put(m));
+                afiseaza(dateMasini);
+            } catch {
+                db.transaction("masini", "readonly").objectStore("masini").getAll().onsuccess = (ev) => {
+                    dateMasini = ev.target.result;
+                    afiseaza("MOD OFFLINE - Date din cache\n\n" + JSON.stringify(dateMasini, null, 2));
+                };
+            }
+
+            document.getElementById("cauta_id").oninput = (ev) => {
+                const valoare = ev.target.value.toUpperCase();
+                if (!valoare) { afiseaza(dateMasini); return; }
+
+                const masinaGasita = dateMasini.find(m => m.id_bula === valoare);
+
+                db.transaction("modificari", "readonly").objectStore("modificari").getAll().onsuccess = (eveniment) => {
+                    const istoricTraseu = eveniment.target.result.filter(mod => mod.id_bula === valoare);
+                    if (masinaGasita || istoricTraseu.length > 0) {
+                        afiseaza({ vehicul: masinaGasita || "Bulă nouă", istoric_tracking: istoricTraseu });
+                    } else {
+                        afiseaza("Nu s-a găsit nimic pentru ID: " + valoare);
+                    }
+                };
+            };
+
+            document.getElementById("btn_aloca").onclick = () => {
+                const idCautat = document.getElementById("cauta_id").value.toUpperCase();
+                const lat = document.getElementById("simuleaza_lat").value;
+                const long = document.getElementById("simuleaza_long").value;
+                const block = document.getElementById("nou_block").value;
+
+                if (dateMasini.some(m => m.id_bula === idCautat) && lat && long && block) {
+                    const punctTraseu = {
+                        id_bula: idCautat,
+                        location_block: block,
+                        latitudine: lat,
+                        longitudine: long,
+                        data_modificare: new Date().toLocaleString("ro-RO")
+                    };
+
+                    const tranzactie = db.transaction("modificari", "readwrite");
+                    tranzactie.objectStore("modificari").add(punctTraseu);
+                    tranzactie.oncomplete = () => {
+                        document.getElementById("cauta_id").dispatchEvent(new Event('input'));
+                    };
+                } else {
+                    alert("ID inexistent sau câmpuri necompletate!");
+                }
+            };
+
+            // FUNCȚIA DE TRIMITERE (EXPORT CĂTRE SERVERUL GO)
+            document.getElementById("btn_trimite").onclick = () => {
+                // 1. Citim tot ce s-a adunat în tabelul local "modificari"
+                db.transaction("modificari", "readonly").objectStore("modificari").getAll().onsuccess = async (ev) => {
+                    const deTrimis = ev.target.result;
+
+                    if (deTrimis.length === 0) {
+                        alert("Nu ai nicio locație nouă salvată pe laptop pentru export!");
+                        return;
+                    }
+
+                    try {
+                        // 2. Facem POST către serverul tău Go (presupunem endpoint-ul /salveaza-tracking)
+                        const raspuns = await fetch("http://localhost:9977/salveaza-tracking", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(deTrimis) // Trimitem array-ul curat cu istoricul
+                        });
+
+                        if (raspuns.ok) {
+                            // 3. Dacă serverul Go a zis OK și le-a scris în SQLite, ștergem tabelul local ca să nu le duplicăm data viitoare
+                            const stergere = db.transaction("modificari", "readwrite");
+                            stergere.objectStore("modificari").clear();
+
+                            stergere.oncomplete = () => {
+                                alert("Datele au fost sincronizate cu succes în baza SQLite3!");
+                                afiseaza("Toate modificările au fost trimise. Stoc local gol.");
+                            };
+                        } else {
+                            alert(`Serverul Go a returnat eroare: ${raspuns.status}`);
+                        }
+                    } catch (eroare) {
+                        alert("Nu s-a putut contacta serverul Go. Ai pornit containerul/baza? " + eroare.message);
+                    }
+                };
+            };
+        };
+    })();
+</script>
+
+</body>
+</html>

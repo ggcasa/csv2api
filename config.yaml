@@ -1,6 +1,6 @@
 generator:
   numar_linii: 5000
-  lungime_id: 17
+  lungime_id: 5
   cale_iesire_csv: "cars.csv"
 
 migrare:
@@ -15,10 +15,11 @@ server:
 atribute:
   marci:
     - "Dacia"
-    - "Trabant"
     - "Aro"
     - "DAC"
     - "Roman"
+    - "Rocar"
+    - "Oltcit"
   culori:
     - "Alb"
     - "Negru"
@@ -31,7 +32,7 @@ atribute:
     - "Zona A1"
     - "Bloc Nord"
     - "Terminal Sud"
-    - "Hangar 2"
+    - "A5"
   greutate_interval:
     min: 600
     max: 3500
