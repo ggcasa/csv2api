@@ -1,0 +1,40 @@
+generator:
+  numar_linii: 5000
+  lungime_id: 17
+  cale_iesire_csv: "cars.csv"
+
+migrare:
+  cale_intrare_csv: "cars.csv"
+  cale_baza_date: "cars.db"
+  nume_tabel: "masini"
+
+server:
+  port: ":9977"
+  api_endpoint: "/"
+
+atribute:
+  marci:
+    - "Dacia"
+    - "Trabant"
+    - "Aro"
+    - "DAC"
+    - "Roman"
+  culori:
+    - "Alb"
+    - "Negru"
+    - "Rosu"
+    - "Albastru"
+    - "Verde"
+    - "Galben"
+    - "Gri"
+  locatie_blocuri:
+    - "Zona A1"
+    - "Bloc Nord"
+    - "Terminal Sud"
+    - "Hangar 2"
+  greutate_interval:
+    min: 600
+    max: 3500
+  marime_interval:
+    min: 3
+    max: 15

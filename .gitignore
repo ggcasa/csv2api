@@ -1,0 +1,6 @@
+# Ignoră fișierele de date generate
+*.csv
+*.db
+
+# Ignoră executabilele compilate
+bin/
