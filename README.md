@@ -67,15 +67,15 @@ go mod tidy
 ### 2. Executarea directă (Mod Dezvoltare)
 #### generarea documentului cars.csv
 ```bash
-go run cmd/generator/generator.go config.go
+go run cmd/generator/generator.go
 ```
 #### Migrarerea documentului csv la sqlite3
 ```bash
-go run cmd/migrator/migrator.go config.go
+go run cmd/migrator/migrator.go
 ```
 #### Rulare server port:9977 
 ```bash
-go run cmd/server/server.go config.go
+go run cmd/server/server.go
 ```
 ### 3. Compilarea nativă în binare independente
 ```bash
